@@ -60,5 +60,18 @@ exports.concat = {
     test.equal(actual, expected, 'should have processed file content.');
 
     test.done();
+  },
+  sourcemap_options: function(test) {
+    test.expect(2);
+
+    var actual = getNormalizedFile('tmp/sourcemap_options');
+    var expected = getNormalizedFile('test/expected/sourcemap_options');
+    test.equal(actual, expected, 'should output the source as normal.');
+
+    actual = getNormalizedFile('tmp/sourcemap2_options.map');
+    expected = getNormalizedFile('test/expected/sourcemap2_options.map');
+    test.equal(actual, expected, 'should output the constructed map.');
+
+    test.done();
   }
 };

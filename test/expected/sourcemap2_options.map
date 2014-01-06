@@ -1,0 +1,16 @@
+{
+  "version": 3,
+  "file": "sourcemap2_options",
+  "sources": [
+    "tmp/sourcemap_options",
+    "test/fixtures/file1",
+    "test/fixtures/file2"
+  ],
+  "names": [],
+  "mappings": "AAAA;ACAA;ACAA;AFGA;AACA,E;AEJA,K",
+  "sourcesContent": [
+    null,
+    "file1",
+    "file2"
+  ]
+}

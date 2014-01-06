@@ -13,6 +13,7 @@ module.exports = function(grunt) {
   // Internal lib.
   var comment = require('./lib/comment').init(grunt);
   var chalk = require('chalk');
+  var sourcemap = require('./lib/sourcemap').init(grunt);
 
   grunt.registerMultiTask('concat', 'Concatenate files.', function() {
     // Merge task-specific and/or target-specific options with these defaults.
@@ -21,16 +22,24 @@ module.exports = function(grunt) {
       banner: '',
       footer: '',
       stripBanners: false,
-      process: false
+      process: false,
+      sourceMap: false
     });
 
     // Normalize boolean options that accept options objects.
     if (options.stripBanners === true) { options.stripBanners = {}; }
     if (options.process === true) { options.process = {}; }
+    if (options.sourceMap === true) { options.sourceMap = {}; }
 
     // Process banner and footer.
     var banner = grunt.template.process(options.banner);
     var footer = grunt.template.process(options.footer);
+
+    // Initialize source map objects.
+    var sourceObject;
+    if (options.sourceMap) {
+      sourceObject = sourcemap.object(banner, footer, options);
+    }
 
     // Iterate over all src-dest file pairs.
     this.files.forEach(function(f) {
@@ -43,7 +52,7 @@ module.exports = function(grunt) {
         } else {
           return true;
         }
-      }).map(function(filepath) {
+      }).map(function(filepath, i) {
         // Read file source.
         var src = grunt.file.read(filepath);
         // Process files as templates if requested.
@@ -56,8 +65,21 @@ module.exports = function(grunt) {
         if (options.stripBanners) {
           src = comment.stripBanner(src, options.stripBanners);
         }
+        // Add the lines of this file to our map.
+        if (options.sourceMap) {
+          src = sourcemap.addlines(sourceObject, src, filepath, options);
+          if (i < f.src.length - 1) {
+            sourcemap.add(sourceObject, options.separator, options);
+          }
+        }
         return src;
       }).join(options.separator) + footer;
+
+      if (options.sourceMap) {
+        // Add sourceMappingURL to the end.
+        // It'll write the map at the same time.
+        src += sourcemap.url(sourceObject, f, options);
+      }
 
       // Write the destination file.
       grunt.file.write(f.dest, src);

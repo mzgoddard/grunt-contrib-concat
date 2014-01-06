@@ -62,6 +62,27 @@ module.exports = function(grunt) {
           'tmp/process_function': ['test/fixtures/file1', 'test/fixtures/file2']
         }
       },
+      sourcemap_options: {
+        options: {
+          banner: '// banner\n',
+          footer: '\n// footer',
+          sourceMap: {
+            content: true,
+            inline: true
+          }
+        },
+        files: {
+          'tmp/sourcemap_options': ['test/fixtures/file1', 'test/fixtures/file2']
+        }
+      },
+      sourcemap2_options: {
+        options: {
+          sourceMap: true
+        },
+        files: {
+          'tmp/sourcemap2_options': ['tmp/sourcemap_options', 'test/fixtures/file2']
+        }
+      }
     },
 
     // Unit tests.
