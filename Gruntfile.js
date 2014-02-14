@@ -10,6 +10,8 @@
 
 module.exports = function(grunt) {
 
+  var path = require('path');
+
   // Project configuration.
   grunt.initConfig({
     jshint: {
@@ -66,21 +68,42 @@ module.exports = function(grunt) {
         options: {
           banner: '// banner\n',
           footer: '\n// footer',
-          sourceMap: {
-            content: true,
-            inline: true
-          }
+          sourceMap: true,
+          sourceMapStyle: 'inline'
         },
         files: {
-          'tmp/sourcemap_options': ['test/fixtures/file1', 'test/fixtures/file2']
+          'tmp/sourcemap_inline': [
+            'test/fixtures/file1',
+            'test/fixtures/file2'
+          ]
         }
       },
       sourcemap2_options: {
         options: {
-          sourceMap: true
+          sourceMap: true,
+          sourceMapName: function(dest) {
+            return path.join(
+              path.dirname(dest),
+              'maps',
+              path.basename(dest) + '.map'
+            );
+          },
+          sourceMapStyle: 'link'
         },
         files: {
-          'tmp/sourcemap2_options': ['tmp/sourcemap_options', 'test/fixtures/file2']
+          'tmp/sourcemap2_link': [
+            'tmp/sourcemap_inline',
+            'test/fixtures/file2'
+          ]
+        }
+      },
+      sourcemap3_options: {
+        options: {
+          sourceMap: true,
+          sourceMapName: 'tmp/sourcemap3_embed_map.map'
+        },
+        files: {
+          'tmp/sourcemap3_embed': 'tmp/sourcemap2_link'
         }
       }
     },

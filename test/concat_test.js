@@ -62,14 +62,18 @@ exports.concat = {
     test.done();
   },
   sourcemap_options: function(test) {
-    test.expect(2);
+    test.expect(3);
 
-    var actual = getNormalizedFile('tmp/sourcemap_options');
-    var expected = getNormalizedFile('test/expected/sourcemap_options');
-    test.equal(actual, expected, 'should output the source as normal.');
+    var actual = getNormalizedFile('tmp/sourcemap_inline');
+    var expected = getNormalizedFile('test/expected/sourcemap_inline');
+    test.equal(actual, expected, 'should output the source with inlined map.');
 
-    actual = getNormalizedFile('tmp/sourcemap2_options.map');
-    expected = getNormalizedFile('test/expected/sourcemap2_options.map');
+    actual = getNormalizedFile('tmp/maps/sourcemap2_link.map');
+    expected = getNormalizedFile('test/expected/sourcemap2_link.map');
+    test.equal(actual, expected, 'should output the constructed map.');
+
+    actual = getNormalizedFile('tmp/sourcemap3_embed_map.map');
+    expected = getNormalizedFile('test/expected/sourcemap3_embed.map');
     test.equal(actual, expected, 'should output the constructed map.');
 
     test.done();

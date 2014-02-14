@@ -23,26 +23,27 @@ module.exports = function(grunt) {
       footer: '',
       stripBanners: false,
       process: false,
-      sourceMap: false
+      sourceMap: false,
+      sourceMapName: undefined,
+      sourceMapStyle: 'embed'
     });
 
     // Normalize boolean options that accept options objects.
     if (options.stripBanners === true) { options.stripBanners = {}; }
     if (options.process === true) { options.process = {}; }
-    if (options.sourceMap === true) { options.sourceMap = {}; }
 
     // Process banner and footer.
     var banner = grunt.template.process(options.banner);
     var footer = grunt.template.process(options.footer);
 
-    // Initialize source map objects.
-    var sourceObject;
-    if (options.sourceMap) {
-      sourceObject = sourcemap.object(banner, footer, options);
-    }
-
     // Iterate over all src-dest file pairs.
     this.files.forEach(function(f) {
+      // Initialize source map objects.
+      var sourceMapHelper;
+      if (options.sourceMap) {
+        sourceMapHelper = sourcemap.helper(banner, footer, f, options);
+      }
+
       // Concat banner + specified files + footer.
       var src = banner + f.src.filter(function(filepath) {
         // Warn on and remove invalid source files (if nonull was set).
@@ -67,9 +68,9 @@ module.exports = function(grunt) {
         }
         // Add the lines of this file to our map.
         if (options.sourceMap) {
-          src = sourcemap.addlines(sourceObject, src, filepath, options);
+          src = sourceMapHelper.addlines(src, filepath);
           if (i < f.src.length - 1) {
-            sourcemap.add(sourceObject, options.separator, options);
+            sourceMapHelper.add(options.separator);
           }
         }
         return src;
@@ -78,7 +79,7 @@ module.exports = function(grunt) {
       if (options.sourceMap) {
         // Add sourceMappingURL to the end.
         // It'll write the map at the same time.
-        src += sourcemap.url(sourceObject, f, options);
+        src += sourceMapHelper.url();
       }
 
       // Write the destination file.

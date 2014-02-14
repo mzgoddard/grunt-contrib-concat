@@ -8,48 +8,89 @@
 
 'use strict';
 
-exports.init = function( grunt ) {
+exports.init = function(grunt) {
   var exports = {};
 
+  // Node first party libs
   var path = require('path');
 
+  // Third party libs
+  var chalk = require('chalk');
   var SourceMapConsumer = require('source-map').SourceMapConsumer;
   var SourceMapGenerator = require('source-map').SourceMapGenerator;
   var SourceNode = require('source-map').SourceNode;
 
   // Return an object that is used to track sourcemap data between calls.
-  exports.object = function(banner, footer, options) {
+  exports.helper = function(banner, footer, files, options) {
     var node = new SourceNode();
     node.add(banner);
+
     // Force sourcesContent if the source has been edited.
     if (options.stripBanners || options.process) {
-      if (!options.sourceMap.content) {
+      if (options.sourceMapStyle === 'link') {
         grunt.warn(
           'stripBanners or process option is enabled. ' +
-          'Set sourceMap.content option to true.'
+          'Set sourceMapStyle option to \'embed\' or \'inline\'.'
         );
       }
-      options.sourceMap.content = true;
+
+      // Continue on, but let the developer know that we are forcing embed.
+      grunt.log.warn('Executing as if sourceMapStyle was set to \'embed\'.');
+      options.sourceMapStyle = 'embed';
     }
-    return {
+
+    // Inline style and sourceMapName together doesn't work
+    if (options.sourceMapStyle === 'inline' && options.sourceMapName) {
+      grunt.log.warn(
+        'Source map will be inlined, sourceMapName option ignored.'
+      );
+    }
+
+    // Figure out the source map destination.
+    var dest = files.dest;
+    if (options.sourceMapStyle === 'inline') {
+      // Leave dest as is. It will be used to compute relative sources.
+    } else if (typeof options.sourceMapName === 'string') {
+      dest = options.sourceMapName;
+    } else if (typeof options.sourceMapName === 'function') {
+      dest = options.sourceMapName(dest);
+    } else {
+      dest = dest + '.map';
+    }
+
+    return new SourceMapConcatHelper({
       banner: banner,
       footer: footer,
       maps: [],
-      node: node
-    };
+      node: node,
+      files: files,
+      dest: dest,
+      options: options
+    });
   };
 
+  function SourceMapConcatHelper(options) {
+    this.banner = options.banner;
+    this.footer = options.footer;
+    this.maps = options.maps;
+    this.node = options.node;
+    this.files = options.files;
+    this.dest = options.dest;
+    this.options = options.options;
+  }
+
   // Add some arbitraty text to the sourcemap.
-  exports.add = function( sourceObject, src, options ) {
-    sourceObject.node.add(src);
+  SourceMapConcatHelper.prototype.add = function(src) {
+    this.node.add(src);
   };
 
   // Add the lines of a given file to the sourcemap. If in the file, store a
   // prior sourcemap and return src with sourceMappingURL removed.
-  exports.addlines = function(
-    sourceObject, src, filename, options
-  ) {
+  SourceMapConcatHelper.prototype.addlines = function(src, filename) {
     var lines = src.split('\n');
+
+    var relativeFilename = path.relative(path.dirname(this.dest), filename);
+
     src = lines.map(function(line, j) {
       // Add back a linefeed to all but the last line.
       if (j < lines.length - 1) {
@@ -61,13 +102,17 @@ exports.init = function( grunt ) {
           /\/\*#\s+sourceMappingURL=([^\s]+)\s+\*\//.test(line)
       ) {
         var sourceMapFile = RegExp.$1;
-        var sourceMapPath = filename.replace(/[^\/]*$/, sourceMapFile);
+        var sourceMapPath;
 
         var sourceContent;
         // Browserify, as an example, stores a datauri at sourceMappingURL.
         if (/data:application\/json;base64,([^\s]+)/.test(sourceMapFile)) {
+          // Set sourceMapPath to the file that the map is inlined.
+          sourceMapPath = filename;
           sourceContent = new Buffer(RegExp.$1, 'base64').toString();
         } else {
+          // Set sourceMapPath relative to file that is refering to it.
+          sourceMapPath = path.join(path.dirname(filename), sourceMapFile);
           sourceContent = grunt.file.read(sourceMapPath);
         }
         var sourceMap = JSON.parse(sourceContent);
@@ -75,23 +120,29 @@ exports.init = function( grunt ) {
         if (typeof sourceMap.version === 'string') {
           sourceMap.version = parseInt(sourceMap.version, 10);
         }
-        if (typeof sourceMap.names === 'undefined') {
-          sourceMap.names = [];
-        }
         // List the filename argument for the source map.
-        sourceMap.file = filename;
+        sourceMap.file = relativeFilename;
+        // Consider the relative path from source files to new sourcemap.
+        sourceMap.sources = sourceMap.sources.map(function(source) {
+          // If map is stored in dist/maps/ and source is src/code.js,
+          // then this would return ../../src/code.js
+          return path.relative(
+            path.dirname(this.dest),
+            path.join(path.dirname(sourceMapPath), source)
+          );
+        }, this);
         // Store the sourceMap so that it may later be consumed.
-        sourceObject.maps.push(sourceMap);
+        this.maps.push(sourceMap);
         // Remove the old sourceMappingURL.
         line = line.replace(/[@#]\s+sourceMappingURL=[^\s]+/, '');
       }
 
-      sourceObject.node.add(new SourceNode(j + 1, 0, filename, line));
+      this.node.add(new SourceNode(j + 1, 0, relativeFilename, line));
       return line;
-    }).join('');
+    }, this).join('');
 
-    if (options.sourceMap.content) {
-      sourceObject.node.setSourceContent(filename, src);
+    if (this.options.sourceMapStyle !== 'link') {
+      this.node.setSourceContent(relativeFilename, src);
     }
 
     return src;
@@ -99,59 +150,62 @@ exports.init = function( grunt ) {
 
   // Return the comment sourceMappingURL that must be appended to the
   // concatenated file.
-  exports.url = function(sourceObject, f, options) {
-    sourceObject.node.add(sourceObject.footer);
+  SourceMapConcatHelper.prototype.url = function() {
+    this.node.add(this.footer);
 
     // Create the map filepath. Either datauri or destination path.
     var mapfilepath;
-    if (options.sourceMap.inline) {
-      mapfilepath = 'data:application/json;base64,' + new Buffer(
-        this.write(sourceObject, f, options)
-      ).toString('base64');
+    if (this.options.sourceMapStyle === 'inline') {
+      var inlineMap = new Buffer(this.write()).toString('base64');
+      mapfilepath = 'data:application/json;base64,' + inlineMap;
     } else {
-      mapfilepath = f.dest.substring(f.dest.lastIndexOf('/') + 1) + '.map';
+      // Compute relative path to source map destination.
+      mapfilepath = path.relative(path.dirname(this.files.dest), this.dest);
     }
     // Create the sourceMappingURL.
     var url;
-    if (/\.css$/.test(f.dest)) {
+    if (/\.css$/.test(this.files.dest)) {
       url = '\n/*# sourceMappingURL=' + mapfilepath + ' */';
     } else {
       url = '\n//# sourceMappingURL=' + mapfilepath;
     }
     // Record the created url.
-    sourceObject.node.add(url);
+    this.node.add(url);
     // For not inlined source, write the map file.
-    if (!options.sourceMap.inline) {
-      this.write(sourceObject, f, options);
+    if (this.options.sourceMapStyle !== 'inline') {
+      this.write();
     }
     return url;
   };
 
   // Return a string for inline use or write the source map to disk.
-  exports.write = function(sourceObject, f, options) {
-    var code_map = sourceObject.node.toStringWithSourceMap({
-      file: f.dest,
-      sourceRoot: options.sourceMap.root
+  SourceMapConcatHelper.prototype.write = function() {
+    var code_map = this.node.toStringWithSourceMap({
+      file: path.relative(path.dirname(this.dest), this.files.dest)
     });
     // Consume the new sourcemap.
     var generator = SourceMapGenerator.fromSourceMap(
       new SourceMapConsumer(code_map.map.toJSON())
     );
     // Consume sourcemaps for source files.
-    sourceObject.maps.forEach(function(sourceMap){
+    this.maps.forEach(function(sourceMap){
       generator.applySourceMap(new SourceMapConsumer(sourceMap));
     });
     // New sourcemap.
     var newSourceMap = generator.toJSON();
     newSourceMap.file = path.basename(newSourceMap.file);
     // Return a string for inline use or write the map.
-    if (options.sourceMap.inline) {
-      return JSON.stringify(newSourceMap, null, '  ');
+    if (this.options.sourceMapStyle === 'inline') {
+      grunt.log.writeln(
+        'Source map for ' + chalk.cyan(this.files.dest) + ' inlined.'
+      );
+      return JSON.stringify(newSourceMap, null, '');
     } else {
       grunt.file.write(
-        f.dest + '.map',
-        JSON.stringify(newSourceMap, null, '  ')
+        this.dest,
+        JSON.stringify(newSourceMap, null, '')
       );
+      grunt.log.writeln('Source map ' + chalk.cyan(this.dest) + ' created.');
     }
   };
 
