@@ -52,15 +52,19 @@ _(Default processing options are explained in the [grunt.template.process][] doc
   [grunt.template.process]: https://github.com/gruntjs/grunt/wiki/grunt.template#grunttemplateprocess
 
 ## sourceMap
-Type: `Boolean` `Object`
+Type: `Boolean`
 Default: `false`
 
-Write a source map of the concatenated file to disk.
+Set to true to create a source map. The source map will be created alongside the destination file, and share the same file name with the `.map` extension appended to it.
 
-* `false` - No source map is written.
-* `true` - Write a source map to `dest.map`.
-* `options` object:
-  * By default, behaves as if `true` was specified.
-  * `content` - If true, the content of the source files is stored in the map.
-  * `inline` - If true, the source map will be embedded as a datauri instead of being written to disk.
-  * `root` - A string, stored in the source map as sourceRoot, instructs a browser's inspector where to locate the root directory of the mapped source.
+## sourceMapName
+Type: `String` `Function`
+Default: `undefined`
+
+To customize the name or location of the generated source map, pass a string to indicate where to write the source map to. If a function is provided, the concat destination is passed as the argument and the return value will be used as the file name.
+
+## sourceMapStyle
+Type: `String`
+Default: `embed`
+
+Determines the type of source map that is generated. The default value, `embed`, places the content of the sources directly into the map. `link` will reference the original sources in the map as links. `inline` will store the entire map as a data URI in the destination file.
