@@ -19,6 +19,7 @@ exports.init = function(grunt) {
   var SourceMapConsumer = require('source-map').SourceMapConsumer;
   var SourceMapGenerator = require('source-map').SourceMapGenerator;
   var SourceNode = require('source-map').SourceNode;
+  var SourceMapUtil = require('source-map/source-map/util');
 
   // Return an object that is used to track sourcemap data between calls.
   exports.helper = function(files, options) {
@@ -94,7 +95,10 @@ exports.init = function(grunt) {
           sourceContent = new Buffer(RegExp.$1, 'base64').toString();
         } else {
           // Set sourceMapPath relative to file that is refering to it.
-          sourceMapPath = path.join(path.dirname(filename), sourceMapFile);
+          sourceMapFile = SourceMapUtil.join(
+            path.dirname(filename),
+            sourceMapFile
+          );
           sourceContent = grunt.file.read(sourceMapPath);
         }
         var sourceMap = JSON.parse(sourceContent);
