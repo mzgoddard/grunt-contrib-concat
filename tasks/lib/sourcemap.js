@@ -168,7 +168,6 @@ exports.init = function(grunt) {
     });
     // New sourcemap.
     var newSourceMap = generator.toJSON();
-    newSourceMap.file = path.basename(newSourceMap.file);
     // Return a string for inline use or write the map.
     if (this.options.sourceMapStyle === 'inline') {
       grunt.log.writeln(
