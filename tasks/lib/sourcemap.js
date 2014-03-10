@@ -106,19 +106,13 @@ exports.init = function(grunt) {
         if (typeof sourceMap.version === 'string') {
           sourceMap.version = parseInt(sourceMap.version, 10);
         }
-        // List the filename argument for the source map.
-        sourceMap.file = relativeFilename;
-        // Consider the relative path from source files to new sourcemap.
-        sourceMap.sources = sourceMap.sources.map(function(source) {
-          // If map is stored in dist/maps/ and source is src/code.js,
-          // then this would return ../../src/code.js
-          return path.relative(
-            path.dirname(this.dest),
-            path.join(path.dirname(sourceMapPath), source)
-          );
-        }, this);
         // Store the sourceMap so that it may later be consumed.
-        this.maps.push(sourceMap);
+        this.maps.push([
+          new SourceMapConsumer(sourceMap),
+          relativeFilename,
+          // Consider the relative path from source files to new sourcemap.
+          path.relative(path.dirname(this.dest), path.dirname(sourceMapPath))
+        ]);
         // Remove the old sourceMappingURL.
         line = line.replace(/[@#]\s+sourceMappingURL=[^\s]+/, '');
       }
@@ -167,9 +161,7 @@ exports.init = function(grunt) {
       new SourceMapConsumer(code_map.map.toJSON())
     );
     // Consume sourcemaps for source files.
-    this.maps.forEach(function(sourceMap){
-      generator.applySourceMap(new SourceMapConsumer(sourceMap));
-    });
+    this.maps.forEach(Function.apply.bind(generator.applySourceMap, generator));
     // New sourcemap.
     var newSourceMap = generator.toJSON();
     // Return a string for inline use or write the map.
