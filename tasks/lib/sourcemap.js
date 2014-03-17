@@ -93,8 +93,12 @@ exports.init = function(grunt) {
           sourceMapPath = filename;
           sourceContent = new Buffer(RegExp.$1, 'base64').toString();
         } else {
-          // Set sourceMapPath relative to file that is refering to it.
-          sourceMapPath = path.join(path.dirname(filename), sourceMapFile);
+          if (path.isAbsolute(sourceMapFile)) {
+            sourceMapPath = sourceMapFile;
+          } else {
+            // Set sourceMapPath relative to file that is refering to it.
+            sourceMapPath = path.join(path.dirname(filename), sourceMapFile);
+          }
           sourceContent = grunt.file.read(sourceMapPath);
         }
         var sourceMap = JSON.parse(sourceContent);
