@@ -73,6 +73,8 @@ exports.init = function(grunt) {
 
     var relativeFilename = path.relative(path.dirname(this.dest), filename);
 
+    var sourceMapExisted = false;
+
     src = lines.map(function(line, j) {
       // Add back a linefeed to all but the last line.
       if (j < lines.length - 1) {
@@ -83,6 +85,7 @@ exports.init = function(grunt) {
         /\/\/[@#]\s+sourceMappingURL=(.+)/.test(line) ||
           /\/\*#\s+sourceMappingURL=(\S+)\s+\*\//.test(line)
       ) {
+        sourceMapExisted = true;
         var sourceMapFile = RegExp.$1;
         var sourceMapPath;
 
@@ -93,7 +96,8 @@ exports.init = function(grunt) {
           sourceMapPath = filename;
           sourceContent = new Buffer(RegExp.$1, 'base64').toString();
         } else {
-          if (path.isAbsolute(sourceMapFile)) {
+          if (path.resolve(sourceMapFile) === path.normalize(sourceMapFile)) {
+            // Set sourceMapPath to sourceMapFile if it is an absolute path.
             sourceMapPath = sourceMapFile;
           } else {
             // Set sourceMapPath relative to file that is refering to it.
@@ -116,6 +120,37 @@ exports.init = function(grunt) {
       this.node.add(new SourceNode(j + 1, 0, relativeFilename, line));
       return line;
     }, this).join('');
+
+    if (!sourceMapExisted) {
+      // The given source does not have a sourcemap. Create an imperfect source
+      // map since we can not create a better one at this stage without knowing
+      // how to handle the specific source.
+      var line = 1;
+      var column = 0;
+      var generator = new SourceMapGenerator({
+        file: relativeFilename
+      });
+      src.split(/\b/g).forEach(function(term) {
+        generator.addMapping({
+          generated: {line: line, column: column}
+        });
+        var oldLine = line;
+        line += term.split('').reduce(function(v, char) {
+          return v + (char === '\n' ? 1 : 0);
+        }, 0);
+        if (oldLine !== line) {
+          column = 0;
+          column += term.length - term.lastIndexOf('\n');
+        } else {
+          column += term.length;
+        }
+      });
+      this.maps.push([
+        new SourceMapConsumer(generator.toJSON()),
+        relativeFilename,
+        path.relative(path.dirname(this.dest), path.dirname(relativeFilename))
+      ]);
+    }
 
     if (this.options.sourceMapStyle !== 'link') {
       this.node.setSourceContent(relativeFilename, src);

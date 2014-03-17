@@ -109,6 +109,14 @@ module.exports = function(grunt) {
             'test/fixtures/file2'
           ]
         }
+      },
+      sourcemap4_options: {
+        options: {
+          sourceMap: true
+        },
+        files: {
+          'tmp/sm4.js': ['test/fixtures/code.js']
+        }
       }
     },
 
