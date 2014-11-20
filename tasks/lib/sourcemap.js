@@ -72,8 +72,13 @@ exports.init = function(grunt) {
     tokens = tokens.filter(function(t) { return !!t; });
 
     tokens.forEach(function(token) {
-      node.add(new SourceNode(lineIndex, charIndex, name, token));
-      if (token === '\n') {
+      // Add node for any token that has a character that isn't whitespace
+      // (except for newlines).
+      if (/[\S\n]/.test(token)) {
+        node.add(new SourceNode(lineIndex, charIndex, name, token));
+      }
+      // Always calculate the change in lineIndex and charIndex.
+      if (token[token.length - 1] === '\n') {
         lineIndex++;
         charIndex = 0;
       } else {
